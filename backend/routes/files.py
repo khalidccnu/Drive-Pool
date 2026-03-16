@@ -14,7 +14,7 @@ from models.models import DriveAccount, File
 from services.auth_service import verify_token
 from services.drive_service import (
     delete_drive_file,
-    download_file,
+    stream_file,
     list_shared_files,
     list_shared_folder_children,
     list_trash_files,
@@ -123,9 +123,8 @@ def get_download(file_id: int, db: Session = Depends(get_db), _=Depends(verify_t
     if not account or not account.is_connected:
         raise HTTPException(status_code=503, detail="Account not connected")
 
-    content = download_file(account, file.drive_file_id)
     return StreamingResponse(
-        io.BytesIO(content),
+        stream_file(account, file.drive_file_id),
         media_type=file.mime_type or "application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{file.file_name}"'},
     )
@@ -141,9 +140,8 @@ def get_view(file_id: int, db: Session = Depends(get_db), _=Depends(verify_token
     if not account or not account.is_connected:
         raise HTTPException(status_code=503, detail="Account not connected")
 
-    content = download_file(account, file.drive_file_id)
     return StreamingResponse(
-        io.BytesIO(content),
+        stream_file(account, file.drive_file_id),
         media_type=file.mime_type or "application/octet-stream",
         headers={"Content-Disposition": f'inline; filename="{file.file_name}"'},
     )
@@ -249,9 +247,8 @@ def download_shared_file(account_index: int, drive_file_id: str, db: Session = D
     account = db.query(DriveAccount).filter(DriveAccount.account_index == account_index).first()
     if not account or not account.is_connected:
         raise HTTPException(status_code=503, detail="Account not connected")
-    content = download_file(account, drive_file_id)
     return StreamingResponse(
-        io.BytesIO(content),
+        stream_file(account, drive_file_id),
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{drive_file_id}"'},
     )

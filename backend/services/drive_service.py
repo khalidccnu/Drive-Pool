@@ -158,6 +158,29 @@ def download_file(account: DriveAccount, drive_file_id: str) -> bytes:
     return buffer.read()
 
 
+def stream_file(account: DriveAccount, drive_file_id: str):
+    """Yield chunks as they arrive from Google Drive.
+
+    Using a generator means the first bytes reach the client (and any proxy)
+    as soon as the first chunk is ready, instead of waiting for the entire
+    file to be buffered in memory.  This prevents proxy timeouts (ECONNRESET)
+    for large files or slow connections.
+    """
+    service = build_service(account)
+    request = service.files().get_media(fileId=drive_file_id)
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    pos = 0
+    while not done:
+        _, done = _retry_on_rate_limit(downloader.next_chunk)
+        buffer.seek(pos)
+        chunk = buffer.read()
+        pos = buffer.tell()
+        if chunk:
+            yield chunk
+
+
 def rename_file(account: DriveAccount, drive_file_id: str, new_name: str) -> dict:
     service = build_service(account)
     result = _retry_on_rate_limit(

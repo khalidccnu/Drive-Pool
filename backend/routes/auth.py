@@ -46,7 +46,6 @@ def logout(response: Response):
 
 @router.get("/oauth/new")
 def get_new_oauth_url(
-    request: Request,
     db: Session = Depends(get_db),
     _=Depends(verify_token),
 ):
@@ -65,12 +64,12 @@ def get_new_oauth_url(
     db.add(placeholder)
     db.commit()
 
-    redirect_uri = str(request.base_url) + "api/auth/callback"
+    redirect_uri = config.BACKEND_URL.rstrip("/") + "/api/auth/callback"
     flow = get_oauth_flow(redirect_uri)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="consent",
+        prompt="select_account consent",
         state=str(new_index),
     )
     if flow.code_verifier:
@@ -79,13 +78,13 @@ def get_new_oauth_url(
 
 
 @router.get("/oauth/{account_index}")
-def get_oauth_url(account_index: int, request: Request, _=Depends(verify_token)):
-    redirect_uri = str(request.base_url) + "api/auth/callback"
+def get_oauth_url(account_index: int, _=Depends(verify_token)):
+    redirect_uri = config.BACKEND_URL.rstrip("/") + "/api/auth/callback"
     flow = get_oauth_flow(redirect_uri)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="consent",
+        prompt="select_account consent",
         state=str(account_index),
     )
     if flow.code_verifier:
@@ -102,7 +101,7 @@ def oauth_callback(
     db: Session = Depends(get_db),
 ):
     account_index = int(state)
-    redirect_uri = str(request.base_url) + "api/auth/callback"
+    redirect_uri = config.BACKEND_URL.rstrip("/") + "/api/auth/callback"
     flow = get_oauth_flow(redirect_uri)
     code_verifier = _pending_verifiers.pop(account_index, None)
     if code_verifier:

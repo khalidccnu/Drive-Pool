@@ -266,6 +266,9 @@ cd Drive-Pool`}
 {`config/
 └── credentials.json   ← your single OAuth client file`}
                 </Block>
+                <Note type="warn">
+                  The <Code>config/</Code> folder is intentionally excluded from Git — its contents are listed in <Code>.gitignore</Code> so your credentials are <strong className="text-dp-text">never</strong> accidentally committed. The folder itself is tracked as an empty placeholder (via <Code>.gitkeep</Code>), so it already exists after cloning. Just drop your downloaded JSON file inside it.
+                </Note>
                 <Note type="info">
                   This one file is reused for every Drive account you connect. Each account gets its own encrypted refresh token stored in the database.
                 </Note>
@@ -301,7 +304,7 @@ cd Drive-Pool`}
                   </ul>
                 </div>
                 <Note type="info">
-                  All three secrets are stored in the <Code>app_config</Code> table inside <Code>backend/drivepool.db</Code>. Re-run the script at any time to change your PIN — it will ask before overwriting.
+                  All three secrets are stored in the <Code>app_config</Code> table inside <Code>backend/drivepool.db</Code> (or the <Code>drivepool_data</Code> Docker volume when running with Docker Compose). Re-run the script at any time to change your PIN — it will ask before overwriting.
                 </Note>
               </div>
             </section>
@@ -351,11 +354,11 @@ npm run dev`}
                   <>Navigate to <span className="font-mono text-orange-400">http://localhost:3000/login</span> and enter your PIN.</>,
                   <>Click <strong className="text-dp-text">Settings</strong> in the left sidebar.</>,
                   <>Click the <strong className="text-dp-text">Connect another account</strong> button in the top-right of the Settings page.</>,
-                  <>You&apos;ll be redirected to Google&apos;s OAuth consent screen. Sign in with one of your Google accounts and grant Drive access.</>,
+                  <>Google will show the <strong className="text-dp-text">account chooser</strong> — select the Google account you want to add, then approve the Drive permission on the consent screen.</>,
                   <>You&apos;ll be redirected back to Settings. The new account card appears with its storage quota.</>,
                 ]} />
                 <Note type="info">
-                  OAuth refresh tokens are encrypted with Fernet before being stored in the database — they are never saved in plain text.
+                  OAuth refresh tokens are encrypted with Fernet (AES-128-CBC) before being stored in the database — they are never saved in plain text.
                 </Note>
               </div>
             </section>
@@ -464,8 +467,12 @@ npm run dev`}
                     a: "Yes. Python and Node.js are both cross-platform.",
                   },
                   {
+                    q: "Can I run it with Docker?",
+                    a: "Yes. Each service has its own Dockerfile (backend/Dockerfile, frontend/Dockerfile). Drop your credentials.json into the config/ folder, then: (1) docker compose build, (2) docker compose run --rm backend python scripts/generate_secrets.py — enter a PIN when prompted, (3) docker compose up -d. The database lives in the drivepool_data named volume and survives rebuilds.",
+                  },
+                  {
                     q: "Can I expose it on the internet?",
-                    a: "DrivePool is designed for local/self-hosted use. You can put it behind a reverse proxy (nginx, Caddy) with HTTPS, but you're responsible for securing the OAuth callback and setting FRONTEND_URL accordingly.",
+                    a: "DrivePool is designed for local/self-hosted use. If you put it behind a reverse proxy (nginx, Caddy) with HTTPS, you must update FRONTEND_URL to your public frontend URL, BACKEND_URL to your public backend URL, and add the new callback URL (BACKEND_URL + /api/auth/callback) to your Google Cloud Console authorized redirect URIs.",
                   },
                 ].map((faq) => (
                   <div key={faq.q} className="p-5">
@@ -486,10 +493,14 @@ npm run dev`}
                 {[
                   {
                     q: "Backend fails to start — config key missing",
-                    a: "Run python backend/scripts/generate_secrets.py. The script creates the app_config table and inserts the three required keys.",
+                    a: "Run python backend/scripts/generate_secrets.py (local) or docker compose run --rm backend python scripts/generate_secrets.py (Docker). The script creates the app_config table and inserts the three required keys.",
                   },
                   {
-                    q: "OAuth callback returns an error",
+                    q: "OAuth callback returns 400 invalid_request (Docker)",
+                    a: "The BACKEND_URL environment variable must match the URL registered in Google Cloud Console. By default it is http://localhost:8000. If your backend is on a different host or port, update BACKEND_URL in docker-compose.yml and add the new callback URL (BACKEND_URL + /api/auth/callback) to your authorized redirect URIs.",
+                  },
+                  {
+                    q: "OAuth callback returns an error (local)",
                     a: "Check that the authorized redirect URI in Google Cloud Console is exactly http://localhost:8000/api/auth/callback. Also confirm the Google account you're signing in with is added as a test user on the OAuth consent screen.",
                   },
                   {
@@ -506,7 +517,7 @@ npm run dev`}
                   },
                   {
                     q: "CORS error in the browser",
-                    a: "Ensure both servers are running — backend on :8000, frontend on :3000. The Next.js dev proxy handles /api/* rewrites automatically.",
+                    a: "Ensure both servers are running — backend on :8000, frontend on :3000. The Next.js dev proxy handles /api/* rewrites automatically. For Docker, check that both containers started with docker compose ps.",
                   },
                 ].map((item) => (
                   <div key={item.q} className="rounded-xl border border-dp-border bg-dp-s1 p-5">
